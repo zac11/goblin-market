@@ -65,16 +65,16 @@ The model returns a constrained plan (`mode`, `message`, `itemIds`, `budget`). A
 
 ## Source map
 
-| File | Responsibility |
-| --- | --- |
-| `src/domain.mjs` | Inventory, quest planning, search, cart arithmetic, and action rules |
+| File               | Responsibility                                                       |
+| ------------------ | -------------------------------------------------------------------- |
+| `src/domain.mjs`   | Inventory, quest planning, search, cart arithmetic, and action rules |
 | `src/protocol.jsx` | Catalog schemas, React implementations, data bindings, A2UI messages |
-| `src/main.jsx` | App shell, agent loop, optional OpenAI connection, inspector |
-| `src/art.jsx` | Original SVG illustrations |
-| `src/style.css` | Responsive visual design and reduced-motion support |
-| `test/` | Cart behavior and validation with the real A2UI processor |
+| `src/main.jsx`     | App shell, agent loop, optional OpenAI connection, inspector         |
+| `src/art.jsx`      | Original SVG illustrations                                           |
+| `src/style.css`    | Responsive visual design and reduced-motion support                  |
+| `test/`            | Cart behavior and validation with the real A2UI processor            |
 
-Tests cover quantity limits, unknown items, discount acceptance, overspending, checkout receipts, budget/allergy filtering, sorting, all four quest trees, data updates, and rejecting components outside the catalog. They test the processor without a browser; they do not substitute for a renderer integration test.
+Tests cover quantity limits, unknown items, discount acceptance, overspending, checkout receipts, budget/allergy filtering, sorting, all four quest trees, data updates, and rejecting components outside the catalog. A jsdom integration test also mounts the official React renderer, clicks Add, checks the bound satchel total, switches to the date tree, and verifies that the checklist updates locally without an agent call. Browser layout QA was unavailable in the managed preview; the published private site requires owner sign-in.
 
 Session state is intentionally ephemeral: refreshing resets the shop and forgets the API key. No payments, accounts, or database are involved.
 
