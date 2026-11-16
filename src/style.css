@@ -1545,7 +1545,8 @@ a2ui-react-shop-layout {
   color: #788a67;
   margin-top: 19px;
 }
-.settings-label input {
+.settings-label input,
+.settings-label select {
   padding: 10px 12px;
   background: #fffef8;
   border: 1px solid #d6dfc9;

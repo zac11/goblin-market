@@ -49,7 +49,19 @@ flowchart LR
 
 **Scripted demo** is the default and is visibly labeled in the app. It supports dragon battles, dragon dates, stealth heists, and forest adventures. It is deterministic, browser-local, and requires no external service. This is a protocol demonstration, not an LLM running secretly behind the scenes.
 
-**Live AI** is optional: click **Configure** under the chat composer, enter your OpenAI API key and a model supporting Chat Completions JSON mode (default `gpt-4.1-mini`), then connect. Requests go directly from the browser to `api.openai.com`. The key exists only in the current tab's React memory; it is not persisted, logged, or sent to the hosting server. OpenAI bills usage to your account. The live mode needs a working key and has not been exercised with a billed API account as part of the no-key demo checks.
+**Live AI** is optional: click **Configure** under the chat composer, choose a provider, enter that provider's API key, and connect. Each provider has its own in-memory key and editable model name. Switching providers disconnects the live agent until you explicitly connect again; keys are never reused across providers.
+
+| Provider | Default model       | Native API                                                 |
+| -------- | ------------------- | ---------------------------------------------------------- |
+| OpenAI   | `gpt-4.1-mini`      | Chat Completions with JSON output                          |
+| Claude   | `claude-sonnet-5-5` | Anthropic Messages with a structured `present_market` tool |
+| Gemini   | `gemini-3.8-flash`  | Google GenerateContent with JSON schema output             |
+
+Use a model your API account can access; the field is editable. Requests go directly from the browser to the selected provider. Keys exist only in the current tab's React memory. They are not persisted, logged, or sent to the hosting server. Refreshing the page or choosing **Use demo mode** in settings clears all keys. The selected provider bills usage to your account.
+
+Claude's browser integration uses Anthropic's documented direct-browser-access header. Your Anthropic organization must permit browser API requests; otherwise Claude returns an access/CORS error. All three adapters have automated tests with mocked API responses; paid live calls have not been exercised with real account keys.
+
+API references: [OpenAI Chat Completions](https://platform.openai.com/docs/api-reference/chat), [Claude Messages](https://platform.claude.com/docs/en/api/messages), [Gemini GenerateContent](https://ai.google.dev/api/generate-content).
 
 The model returns a constrained plan (`mode`, `message`, `itemIds`, `budget`). A trusted adapter compiles that plan into the approved A2UI components. This deliberately small example demonstrates agent-selected layouts; it does not ask the model to invent arbitrary HTML or raw A2UI trees. Item prices, quantities, discount arithmetic, and purchase validation stay in code. In a production commerce app, enforce those rules on a server.
 
@@ -74,9 +86,18 @@ The model returns a constrained plan (`mode`, `message`, `itemIds`, `budget`). A
 | `src/style.css`    | Responsive visual design and reduced-motion support                  |
 | `test/`            | Cart behavior and validation with the real A2UI processor            |
 
-Tests cover quantity limits, unknown items, discount acceptance, overspending, checkout receipts, budget/allergy filtering, sorting, all four quest trees, data updates, and rejecting components outside the catalog. A jsdom integration test also mounts the official React renderer, clicks Add, checks the bound satchel total, switches to the date tree, and verifies that the checklist updates locally without an agent call. Browser layout QA was unavailable in the managed preview; the published private site requires owner sign-in.
+Tests cover quantity limits, unknown items, discount acceptance, overspending, checkout receipts, budget/allergy filtering, sorting, all four quest trees, data updates, and rejecting components outside the catalog. A jsdom integration test also mounts the official React renderer, clicks Add, checks the bound satchel total, switches to the date tree, and verifies that the checklist updates locally without an agent call. The interface and provider selector were also inspected in a local recording build. The published private site requires owner sign-in. Provider tests cover native request formats, key isolation, response validation, refusals/truncation, and redacted errors; they do not make paid API calls.
 
 Session state is intentionally ephemeral: refreshing resets the shop and forgets the API key. No payments, accounts, or database are involved.
+
+## Export a recording build
+
+```sh
+npm run export:recording
+python3 -m http.server 4281 --bind 127.0.0.1 --directory artifacts/recording
+```
+
+Open `http://127.0.0.1:4281/app.html` and record the demo flow above. This creates a self-contained copy of the same app; it does not change the hosted site or its access controls. Use demo mode when recording so credentials stay out of the footage.
 
 ## License
 

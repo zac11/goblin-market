@@ -18,6 +18,7 @@ const result = spawnSync(
     "test/domain.test.mjs",
     "test/protocol.test.mjs",
     "test/render.test.mjs",
+    "test/providers.test.mjs",
   ],
   { stdio: "inherit" },
 );

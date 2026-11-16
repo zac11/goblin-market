@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "test": "node scripts/check.mjs"
+    "test": "node scripts/check.mjs",
+    "export:recording": "node scripts/export-recording.mjs"
   },
   "dependencies": {
     "@a2ui/react": "0.15.0",

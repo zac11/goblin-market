@@ -40,6 +40,11 @@ import {
   ITEMS,
   searchItems,
 } from "./domain.mjs";
+import {
+  PROVIDERS,
+  defaultProviderSettings,
+  requestPlan,
+} from "./providers.mjs";
 import "./style.css";
 const ID = "goblin-shop";
 const examplePrompts = [
@@ -75,8 +80,21 @@ function App() {
   const busyRef = useRef(false);
   const [modal, setModal] = useState(null);
   const [inspectorTab, setInspectorTab] = useState("Messages");
-  const [key, setKey] = useState("");
-  const [model, setModel] = useState("gpt-4.1-mini");
+  const [provider, setProvider] = useState("openai");
+  const [providerSettings, setProviderSettings] = useState(
+    defaultProviderSettings,
+  );
+  const { key, model } = providerSettings[provider];
+  const setKey = (value) =>
+    setProviderSettings((old) => ({
+      ...old,
+      [provider]: { ...old[provider], key: value },
+    }));
+  const setModel = (value) =>
+    setProviderSettings((old) => ({
+      ...old,
+      [provider]: { ...old[provider], model: value },
+    }));
   const [live, setLive] = useState(false);
   const [apiError, setApiError] = useState("");
   const [copied, setCopied] = useState(false);
@@ -184,7 +202,7 @@ function App() {
     setMessages((m) => [...m, { role: "user", text }]);
     record("user → agent", {
       prompt: text,
-      agent: live ? "OpenAI" : "scripted-demo",
+      agent: live ? PROVIDERS[provider].label : "scripted-demo",
     });
     try {
       const prev = stateRef.current;
@@ -194,63 +212,15 @@ function App() {
       } else {
         let plan = planPrompt(text, prev);
         if (live) {
-          const response = await fetch(
-            "https://api.openai.com/v1/chat/completions",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: "Bearer " + key,
-              },
-              signal: AbortSignal.timeout(30000),
-              body: JSON.stringify({
-                model,
-                response_format: { type: "json_object" },
-                messages: [
-                  {
-                    role: "system",
-                    content: `You are Grimble, a witty but helpful goblin shopkeeper. Help equip people for absurd quests. Return JSON only with mode (battle, date, stealth, rain), message (under 65 words), itemIds (3-8 relevant inventory IDs), budget (integer gold). Never invent items or prices. Respect allergies, budgets, and conversation context. A trusted adapter compiles your selection into an A2UI 1.0 component tree. Inventory: ${JSON.stringify(ITEMS)}. Current mode: ${prev.mode}. Current gold: ${prev.balance}. Leather boots must be excluded if a leather allergy is mentioned. Preserve budget unless the user explicitly changes it.`,
-                  },
-                  ...messages
-                    .slice(-8)
-                    .map((m) => ({ role: m.role, content: m.text })),
-                  { role: "user", content: text },
-                ],
-              }),
-            },
-          );
-          if (!response.ok) {
-            const err = await response.json().catch(() => ({}));
-            throw new Error(
-              err.error?.message || `OpenAI returned ${response.status}`,
-            );
-          }
-          const json = await response.json();
-          const result = JSON.parse(json.choices[0].message.content);
-          if (
-            !["battle", "date", "stealth", "rain"].includes(result.mode) ||
-            typeof result.message !== "string" ||
-            !Array.isArray(result.itemIds)
-          )
-            throw new Error(
-              "The model returned an invalid plan. Please try again.",
-            );
-          plan = {
-            ...plan,
-            mode: result.mode,
-            message: result.message,
-            itemIds: [
-              ...new Set(
-                result.itemIds.filter((id) => ITEMS.some((i) => i.id === id)),
-              ),
-            ].slice(0, 8),
-          };
-          if (
-            Number.isInteger(result.budget) &&
-            result.budget >= 0 &&
-            result.budget <= 9999
-          )
-            plan = { ...plan, balance: result.budget, budget: result.budget };
+          const result = await requestPlan({
+            provider,
+            apiKey: key,
+            model,
+            messages,
+            state: prev,
+            prompt: text,
+          });
+          plan = { ...plan, ...result };
         } else {
           await new Promise((resolve) => setTimeout(resolve, 650));
         }
@@ -454,7 +424,9 @@ function App() {
               onClick={() => setModal("settings")}
             >
               <span className="status-dot" />
-              {live ? "Live AI agent" : "Scripted demo agent"}
+              {live
+                ? `${PROVIDERS[provider].label} · live agent`
+                : "Demo mode · no key needed"}
               <span>
                 Configure <ArrowUpRight size={11} />
               </span>
@@ -539,7 +511,7 @@ function App() {
               {modal === "inspector"
                 ? "Actual messages processed by the official A2UI SDK."
                 : modal === "settings"
-                  ? "Demo mode works immediately. Connect OpenAI for open-ended quests."
+                  ? "Demo mode needs no key. Connect OpenAI, Claude, or Gemini for open-ended quests."
                   : "A small, playful demonstration of Agent-to-User Interface."}
             </p>
           </div>
@@ -664,6 +636,7 @@ function App() {
               <div className="mode-options">
                 <button
                   onClick={() => setLive(false)}
+                  disabled={busy}
                   className={!live ? "selected" : ""}
                 >
                   <Terminal size={20} />
@@ -675,24 +648,44 @@ function App() {
                   onClick={() => {
                     if (key.trim()) setLive(true);
                   }}
+                  disabled={busy || !key.trim() || !model.trim()}
                   className={live ? "selected" : ""}
                 >
                   <Wifi size={20} />
                   <strong>Live AI agent</strong>
-                  <p>Open-ended requests powered by your OpenAI key.</p>
+                  <p>Choose OpenAI, Claude, or Gemini with your own API key.</p>
                   {live && <Check size={17} />}
                 </button>
               </div>
               <label className="settings-label">
-                OpenAI API key
+                AI provider
+                <select
+                  value={provider}
+                  disabled={busy}
+                  onChange={(e) => {
+                    setProvider(e.target.value);
+                    setLive(false);
+                    setApiError("");
+                  }}
+                >
+                  {Object.entries(PROVIDERS).map(([id, config]) => (
+                    <option value={id} key={id}>
+                      {config.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="settings-label">
+                {PROVIDERS[provider].label} API key
                 <input
                   type="password"
                   value={key}
                   autoComplete="off"
-                  placeholder="sk-…"
+                  placeholder={PROVIDERS[provider].placeholder}
+                  disabled={busy}
                   onChange={(e) => {
                     setKey(e.target.value);
-                    if (!e.target.value) setLive(false);
+                    setLive(false);
                   }}
                 />
               </label>
@@ -700,14 +693,20 @@ function App() {
                 Model
                 <input
                   value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="gpt-4.1-mini"
+                  onChange={(e) => {
+                    setModel(e.target.value);
+                    setLive(false);
+                  }}
+                  disabled={busy}
+                  placeholder={PROVIDERS[provider].defaultModel}
                 />
               </label>
               <p className="settings-note">
-                Your key stays in this tab’s memory and is sent directly to
-                OpenAI. Refreshing clears it. OpenAI usage is billed to your
-                account.
+                Your keys stay in this tab’s memory. Requests go directly to the
+                selected provider ({PROVIDERS[provider].host}). Refreshing
+                clears all keys. Usage is billed by that provider.
+                {provider === "claude" &&
+                  " Your Anthropic organization must allow direct browser API requests."}
               </p>
               {apiError && (
                 <p className="settings-error" role="alert">
@@ -717,19 +716,19 @@ function App() {
               <div className="modal-buttons">
                 <button
                   className="primary"
-                  disabled={!key.trim() || !model.trim()}
+                  disabled={busy || !key.trim() || !model.trim()}
                   onClick={() => {
                     setLive(true);
                     setModal(null);
                   }}
                 >
-                  Connect live agent <ArrowUpRight size={15} />
+                  Connect {PROVIDERS[provider].label} <ArrowUpRight size={15} />
                 </button>
                 <button
                   className="text-button"
                   onClick={() => {
                     setLive(false);
-                    setKey("");
+                    setProviderSettings(defaultProviderSettings());
                     setModal(null);
                   }}
                 >
